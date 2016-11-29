@@ -1,0 +1,81 @@
+---
+title: "Exploration on Own"
+author: "Hyo Won Shin"
+date: "2016?ÖÑ 11?õî 22?ùº"
+output: html_document
+---
+
+I. What do I want to do? 
+
+For my IPE research design paper, I want to look at the relationship between ideology and financial openness. A large literature has been written on how different ideologies have different outcomes or decisions on financial liberalization: capitalism is usually associated with financial openness, whereas communist countries are more prone to being financially closed.  The theory, which explained the connection between ideology and financial liberalization, was evident during the Cold War, when our world was clearly divided between the Western capitalists and USSR communists. After the demise of the Soviet Union, a majority of former communists that had undergone reform struggled politically and economically, while those that preserved its communist identity eventually opened up its market and gained significant economic success. Countries such as China, Vietnam and even Laos, all of which are still under a communist party, have grown tremendously in the recent decade. I, therefore, would like to re-evaluate the relationship between ideology (communism) and financial liberalization.   
+
+II. What kind of relationship am I looking for? 
+
+Setting the end of Cold War as the starting point, I would like to see how the variation in communism in former/current communist countries and observe whether there is fluctuation in financial openness/closure. According to theory, I would expect post-communist countries that have adopted reform measures to see more financial openness. On the other hand, the countries that have maintained communist would be more prone to financial closure. 
+In order to measure the variation of communism, I would like to religious freedom as a proxy. According to literature, communism and religion cannot go hand in hand. Labeled as the ?Äúopium of the people?Ä? that had been used by the ruling classes to give the working class false hope for millennia, majority of communist countries implemented the rules of state atheism.  I, therefore, will use religious freedom as a proxy measure of communism; the more religious freedom a country allows, the less communist they are and vice versa. A higher level of religious freedom would go along with financial openness and lower level of religious freedom would be associated with financial closure.  
+
+III. What kind of dataset am I looking at? 
+
+The dataset I would use in this research would be the Religion and State Constitutions, 1990-2002 index I found in the Association and Religion Data Archives. This is a university-based project located at Bar Ilan University in Ramat Gan, Israel. The goal of this project is to create a set of measures that systematically gauge the interaction between government and religion. This dataset examines constitutional clauses that address religion for 169 states on a yearly basis between 1990 and 2002. This includes all countries with populations of 250,000 or more, as well as sampling of smaller states. There is a total of 169 cases and 2007 variables. Although there are other data sets measuring religious freedom, the data has been collected over a shorter period of time. As my study would be cross-sectional, I chose to use the data that had been collected for a longer period of time. 
+In order to measure financial openness or closure of a country, I would use the Chinn/Ito index, which is an index measuring a country?Äôs degree of capital account openness. The KAOPEN is based on the binary dummy variables that codify the tabulation of restrictions on cross-border financial transactions reported in the IMF?Äôs Annual Report on Exchange Arrangements and Exchange Restrictions (AREAER). The dataset is across the time period of 1970-2014 for 182 countries.  
+
+IV. Data coding 
+```{r}
+library(plyr)
+#Putting data together
+#GDP = read.csv(file.choose(), header=T)
+#GDP = read.csv("UNdata_Export_20161120_232024055.csv", header=T)
+Religion = read.csv("Religion and State Constitutions, 1990-2002.csv", header=T)
+KAopen = read.csv("kaopen_2014.csv", header=T)
+#Religiousop = read.csv("International Religious Freedom Data, Aggregate File (2001-2005).csv", header=T)
+#Extract SRAS1X from 1990 to 2002 with country names
+year = 1990:2002
+str_temp = list()
+str_temp2 = c()
+for (i in 1:length(year)){
+  str_temp[i] <- toString(year[i])
+  str_temp[i] <- substr(str_temp[i], 3,4)
+  str_temp2  = append(str_temp2, paste("SRAS1X", str_temp[i], sep = ""))
+}
+# Extract CNAME and str_temps2 to make a new dataset
+Religion = Religion[,c("CNAME",str_temp2)]
+#Extract country, year and kaopen to make a new KAopen dataset
+KAopen = KAopen[,c("country","year","ka_open")]
+#Rename CNAME to country
+colnames(Religion)[1] <- "country"
+#Transpose the SRAS1X from colums into rows so that it can be aligned yearly
+Religion_temp = data.frame()
+for (i in 1:length(Religion$country)){
+  temp = data.frame(t(Religion[i,2:length(Religion)]))
+  colnames(temp)[1] <- "SRAS1X"
+  Religion_temp <- rbind(Religion_temp,temp)
+}
+Religion_temp[ , "year"] <- c(1990:2002)
+Religion_temp2 = Religion[rep(seq_len(nrow(Religion)), each=length(str_temp2)),]$country
+Religion_temp[,"country"] <- Religion_temp2
+Religion = Religion_temp
+rownames(Religion) <- NULL
+# Merge two datasets 
+myfulldata <- merge(Religion, KAopen, by = c("country","year"))
+```
+
+Here I worked on merging two datasets so that I can have "country", "year", "SRAS1X90-02" and "KA_open". SRAS1X90-02 are the answers to the survey of "The state may not (shall not, etc.) establish/institute/adopt/recognize a religion". They are binary, where 0 means 'no' and 1 means 'yes'. It took quite a long time trying to clean out data as the SRAS1X were columns and the countries and years were originally arranged in rows. Therefore, I had to transpose the the SRAS1X from columns to rows. After, I made a new column for years in my Religion dataset so that the years 1990-2002 would repeat again and again for each country. I then added the SRAS1X and according to year. I then merged the two datasets by country and year.  
+
+```{r}
+# Plotting 
+# year and ka_open
+plot(myfulldata$year, myfulldata$ka_open);abline(lm(myfulldata$ka_open~myfulldata$year))
+plot(myfulldata$year[myfulldata$country=="China"], myfulldata$ka_open[myfulldata$country=="China"], type="p"); lines(myfulldata$year[myfulldata$country=="Bulgaria"], myfulldata$ka_open[myfulldata$country=="Bulgaria"], col=2, type="l"); lines(myfulldata$year[myfulldata$country=="Poland"], myfulldata$ka_open[myfulldata$country=="Poland"], col=3, type="l")
+#Looking at correlations
+cor(myfulldata$SRAS1X, myfulldata$year, use="complete.obs", method="kendall")
+cor(myfulldata$SRAS1X, myfulldata$ka_open, use="complete.obs", method="kendall")
+#Looking at regression
+regression1 <-lm(ka_open~SRAS1X, data=myfulldata)
+summary(regression1)
+regression <- lm(ka_open~SRAS1X+year,data=myfulldata)
+summary(regression)
+regression0 <-lm(ka_open~SRAS1X, data=myfulldata, subset=country=="China"| country=="Vietnam")
+summary(regression0)
+regressionX <- lm(ka_open~SRAS1X, data=myfulldata, subset=country=="Armenia"| country=="Azerbaijan"|country=="Belarus"|country=="Estonia"|country=="Georgia"|country=="Kazakhstan"|country=="Latvia"|country=="Lithuania"|country=="Moldova"|country=="Tajikistan"|country=="Turkey"|country=="Ukraine"|country=="Uzbekistan")
+summary(regressionX)
+```
